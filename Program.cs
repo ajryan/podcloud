@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -15,21 +16,30 @@ namespace podcloud
     {
       if (args.Length < 2)
       {
-        Console.WriteLine("Usage: podcloud.exe username password [eps to skip]");
+        Console.WriteLine("Usage: podcloud.exe username password [eps to skip|'latest']");
         return;
       }
 
-      XNamespace itunes = "http://www.itunes.com/dtds/podcast-1.0.dtd";
+      IEnumerable<XElement> allItems = XDocument.Parse(GetFeed("https://dopeypodcast.podbean.com/feed/").Result).Descendants("item");
+      IEnumerable<XElement> itemsToProcess;
 
-      int skipCount  = args.Length > 2 ? Int32.Parse(args[2]) : 0;
+      if (args.Length > 2 && args[2] == "latest")
+      {
+        itemsToProcess = new[] { allItems.First() };
+      }
+      else
+      {
+        int skipCount  = args.Length > 2 ? Int32.Parse(args[2]) : 0;
+        itemsToProcess = allItems.Reverse().Skip(skipCount);
+      }
+
       int itemNumber = 0;
 
-      foreach (var item in XDocument.Parse(GetFeed("https://dopeypodcast.podbean.com/feed/").Result).Descendants("item").Reverse())
+      XNamespace itunes = "http://www.itunes.com/dtds/podcast-1.0.dtd";
+
+      foreach (XElement item in itemsToProcess)
       {
         itemNumber++;
-
-        if (itemNumber <= skipCount)
-          continue;
 
         string title = item.Element("title")?.Value;
         string mp3Url = item.Element("enclosure")?.Attribute("url")?.Value;
@@ -40,12 +50,15 @@ namespace podcloud
           continue;
         }
 
+        if (title.Length > 100)
+          title = title.Substring(0, 100);
+
         var podcast = new Podcast
                       {
                         Title       = title,
                         Mp3Url      = mp3Url,
                         ArtUrl      = item.Descendants(itunes + "image").FirstOrDefault()?.FirstAttribute?.Value,
-                        Description = item.Element("description")?.Value,
+                        Description = item.Element("description")?.Value?.Replace("<p>", "")?.Replace("</p>", ""),
                         Tags        = item.Elements("category").Select(e => e.Value).ToArray()
                       };
 
@@ -88,6 +101,7 @@ namespace podcloud
         { GetStringContent(podcast.Title),        "track[title]" },
         { GetStringContent(podcast.Description),  "track[description]" },
         { GetStringContent(podcast.GetTagList()), "track[tag_list]" },
+        { GetStringContent("Storytelling"),       "track[genre]" },
         { GetStringContent("public"),             "track[sharing]" },
         { GetStringContent("podcast"),            "track[track_type]" },
         { mp3Content,                             "track[asset_data]", Path.GetFileName(podcast.Mp3Path)}
@@ -98,7 +112,7 @@ namespace podcloud
         ByteArrayContent artworkContent = new ByteArrayContent(File.ReadAllBytes(podcast.ArtPath));
         artworkContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
-        formContent.Add(artworkContent);
+        formContent.Add(artworkContent, "track[artwork_data]", Path.GetFileName(podcast.ArtPath));
       }
 
       var uploadRequest = new HttpRequestMessage(HttpMethod.Post, $"https://api.soundcloud.com/tracks?oauth_token={accessToken}")
