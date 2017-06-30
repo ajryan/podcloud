@@ -14,22 +14,27 @@ namespace podcloud
   {
     static void Main(string[] args)
     {
-      if (args.Length < 2)
+      if (args.Length < 3)
       {
-        Console.WriteLine("Usage: podcloud.exe username password [eps to skip|'latest']");
+        Console.WriteLine("Usage: podcloud.exe feedurl soundcloudusername soundcloudpassword [# eps to skip|'latest']");
         return;
       }
 
-      IEnumerable<XElement> allItems = XDocument.Parse(GetFeed("https://dopeypodcast.podbean.com/feed/").Result).Descendants("item");
+      string feedUrl            = args[0];
+      string soundCloudUsername = args[1];
+      string soundCloudPassword = args[2];
+      string episodeArg         = args.Length > 3 ? args[3] : null;
+
+      IEnumerable<XElement> allItems = XDocument.Parse(GetFeed(feedUrl).Result).Descendants("item");
       IEnumerable<XElement> itemsToProcess;
 
-      if (args.Length > 2 && args[2] == "latest")
+      if (episodeArg == "latest")
       {
         itemsToProcess = new[] { allItems.First() };
       }
       else
       {
-        int skipCount  = args.Length > 2 ? Int32.Parse(args[2]) : 0;
+        int skipCount  = episodeArg != null ? Int32.Parse(episodeArg) : 0;
         itemsToProcess = allItems.Reverse().Skip(skipCount);
       }
 
