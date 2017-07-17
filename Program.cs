@@ -69,7 +69,7 @@ namespace podcloud
 
         Console.WriteLine($"Item title {podcast.Title}, enclosure {podcast.Mp3Url}, description {podcast.Description} art {podcast.ArtUrl}");
         podcast.DownloadFiles();
-        PostToSoundCloud(podcast, args[0], args[1]);
+        PostToSoundCloud(podcast, soundCloudUsername, soundCloudPassword);
       }
 
       Console.WriteLine("done");
@@ -86,10 +86,11 @@ namespace podcloud
       const string CLIENT_SECRET = "b299b6681e00dfd9f5015639c7f5fe29";
 
       var httpClient = new HttpClient { Timeout = TimeSpan.FromHours(2d) };
+      var requestUrl = $"https://api.soundcloud.com/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=password&username={userName}&password={password}";
 
       var tokenRequest = new HttpRequestMessage(
         HttpMethod.Post,
-        $"https://api.soundcloud.com/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=password&username={userName}&password={password}");
+        requestUrl);
 
       string accessToken = httpClient.SendAsync(tokenRequest).ContinueWith(responseTask =>
       {
