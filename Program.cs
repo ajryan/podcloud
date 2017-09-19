@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,6 +6,9 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json.Linq;
+using RedditSharp;
 
 namespace podcloud
 {
@@ -14,27 +16,30 @@ namespace podcloud
   {
     static void Main(string[] args)
     {
-      if (args.Length < 3)
+      if (!File.Exists("podcloud.json"))
       {
-        Console.WriteLine("Usage: podcloud.exe feedurl soundcloudusername soundcloudpassword [# eps to skip|'latest']");
-        return;
+        Console.WriteLine("Please provide config file podcloud.json. See sampleconfig.json.");
+        Environment.Exit(1);
       }
 
-      string feedUrl            = args[0];
-      string soundCloudUsername = args[1];
-      string soundCloudPassword = args[2];
-      string episodeArg         = args.Length > 3 ? args[3] : null;
+      var builder = new ConfigurationBuilder()
+        .SetBasePath(Directory.GetCurrentDirectory())
+        .AddJsonFile("podcloud.json");
 
-      IEnumerable<XElement> allItems = XDocument.Parse(GetFeed(feedUrl).Result).Descendants("item");
+      var options = new Options();
+
+      builder.Build().Bind(options);
+
+      IEnumerable<XElement> allItems = XDocument.Parse(GetFeed(options.FeedUrl).Result).Descendants("item");
       IEnumerable<XElement> itemsToProcess;
 
-      if (episodeArg == "latest")
+      if (options.UploadLatest)
       {
         itemsToProcess = new[] { allItems.First() };
       }
       else
       {
-        int skipCount  = episodeArg != null ? Int32.Parse(episodeArg) : 0;
+        int skipCount  = options.EpisodeSkipCount ?? 0;
         itemsToProcess = allItems.Reverse().Skip(skipCount);
       }
 
@@ -69,7 +74,12 @@ namespace podcloud
 
         Console.WriteLine($"Item title {podcast.Title}, enclosure {podcast.Mp3Url}, description {podcast.Description} art {podcast.ArtUrl}");
         podcast.DownloadFiles();
-        PostToSoundCloud(podcast, soundCloudUsername, soundCloudPassword);
+
+        if (options.PostToSoundCloud)
+          PostToSoundCloud(podcast, options.SoundCloudUsername, options.SoundCloudPassword);
+
+        if (options.UpdateRedditWiki)
+          UpdateRedditWiki(podcast, options.SubRedditName, options.RedditUsername, options.RedditPassword);
       }
 
       Console.WriteLine("done");
@@ -130,11 +140,32 @@ namespace podcloud
       httpClient.SendAsync(uploadRequest).ContinueWith(responseTask => Console.WriteLine("Response " + responseTask.Result.ToString())).Wait();
     }
 
+    private static void UpdateRedditWiki(Podcast podcast, string subreddit, string username, string password)
+    {
+      var reddit = new Reddit(username, password);
+      var sub = reddit.GetSubreddit(subreddit);
+      var wikiPageContent = sub.Wiki.GetPage("index").MarkdownContent;
+
+      var contentLines = wikiPageContent.Split(Environment.NewLine).ToList();
+      var tableSeparatorIndex = contentLines.IndexOf(":--|:-:|:--|:--");
+      var newEpisodeLine = $"[{podcast.Title}]({podcast.EpisodeUrl})|{podcast.ReleaseDate:d}|{podcast.Description.Replace("\r", null).Replace("\n", null)}|[Mp3]({podcast.Mp3Url})";
+      contentLines.Insert(tableSeparatorIndex + 1, newEpisodeLine);
+
+      Console.WriteLine("New wiki line: " + newEpisodeLine);
+
+      sub.Wiki.EditPage("index", String.Join(Environment.NewLine, contentLines), reason: podcast.Title.Left(256));
+    }
+
     private static StringContent GetStringContent(string content)
     {
       StringContent stringContent = new StringContent(content);
       stringContent.Headers.ContentType = null;
       return stringContent;
     }
+  }
+
+  internal static class StringExtensions
+  {
+    public static string Left(this string value, int length) => value.Length <= length ? value : value.Substring(0, length);
   }
 }

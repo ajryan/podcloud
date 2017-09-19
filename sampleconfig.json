@@ -1,0 +1,12 @@
+{
+    "FeedUrl" :            "http://test.com",
+    "UploadToSoundCloud":  true,
+    "SoundCloudUsername" : "username",
+    "SoundCloudPassword" : "password",
+    "EpisodeSkipCount" :   null,
+    "UploadLatest" :       true,
+    "UpdateReddit":        true,
+    "SubRedditName" :      "dopeypodcast",
+    "RedditUsername" :     "username",
+    "RedditPassword" :     "password"
+}

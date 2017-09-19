@@ -10,17 +10,13 @@ namespace podcloud
   public class Podcast
   {
     public string Title { get; set; }
-
     public string Description { get; set; }
-
     public string[] Tags { get; set; }
-
     public string Mp3Url { get; set; }
-
+    public string EpisodeUrl { get; set; }
+    public DateTime ReleaseDate { get; set; }
     public string ArtUrl { get; set; }
-
     public string Mp3Path { get; private set; }
-
     public string ArtPath { get; private set; }
 
     public string GetTagList()
