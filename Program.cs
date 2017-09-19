@@ -52,6 +52,8 @@ namespace podcloud
         itemNumber++;
 
         string title = item.Element("title")?.Value;
+        string link = item.Element("link")?.Value;
+        DateTime.TryParse(item.Element("pubDate").Value, out var pubDate);
         string mp3Url = item.Element("enclosure")?.Attribute("url")?.Value;
 
         if (String.IsNullOrEmpty(title) || String.IsNullOrEmpty(mp3Url))
@@ -66,17 +68,21 @@ namespace podcloud
         var podcast = new Podcast
                       {
                         Title       = title,
+                        EpisodeUrl  = link,
+                        ReleaseDate = pubDate,
                         Mp3Url      = mp3Url,
                         ArtUrl      = item.Descendants(itunes + "image").FirstOrDefault()?.FirstAttribute?.Value,
                         Description = item.Element("description")?.Value?.Replace("<p>", "")?.Replace("</p>", ""),
                         Tags        = item.Elements("category").Select(e => e.Value).ToArray()
                       };
 
-        Console.WriteLine($"Item title {podcast.Title}, enclosure {podcast.Mp3Url}, description {podcast.Description} art {podcast.ArtUrl}");
-        podcast.DownloadFiles();
+        Console.WriteLine($"Item title {podcast.Title}, link {podcast.EpisodeUrl}, released {podcast.ReleaseDate}, enclosure {podcast.Mp3Url}, art {podcast.ArtUrl}, description {podcast.Description.Left(20)}... ");
 
         if (options.PostToSoundCloud)
+        {
+          podcast.DownloadFiles();
           PostToSoundCloud(podcast, options.SoundCloudUsername, options.SoundCloudPassword);
+        }
 
         if (options.UpdateRedditWiki)
           UpdateRedditWiki(podcast, options.SubRedditName, options.RedditUsername, options.RedditPassword);
@@ -142,6 +148,8 @@ namespace podcloud
 
     private static void UpdateRedditWiki(Podcast podcast, string subreddit, string username, string password)
     {
+      Console.WriteLine("Updating Reddit wiki");
+
       var reddit = new Reddit(username, password);
       var sub = reddit.GetSubreddit(subreddit);
       var wikiPageContent = sub.Wiki.GetPage("index").MarkdownContent;
