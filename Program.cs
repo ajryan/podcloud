@@ -9,6 +9,7 @@ using System.Xml.Linq;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json.Linq;
 using RedditSharp;
+using RedditSharp.Things;
 
 namespace podcloud
 {
@@ -84,8 +85,8 @@ namespace podcloud
           PostToSoundCloud(podcast, options.SoundCloudUsername, options.SoundCloudPassword);
         }
 
-        if (options.UpdateRedditWiki)
-          UpdateRedditWiki(podcast, options.SubRedditName, options.RedditUsername, options.RedditPassword);
+        if (options.UpdateReddit)
+          UpdateReddit(podcast, options.SubRedditName, options.RedditUsername, options.RedditPassword);
       }
 
       Console.WriteLine("done");
@@ -146,7 +147,7 @@ namespace podcloud
       httpClient.SendAsync(uploadRequest).ContinueWith(responseTask => Console.WriteLine("Response " + responseTask.Result.ToString())).Wait();
     }
 
-    private static void UpdateRedditWiki(Podcast podcast, string subreddit, string username, string password)
+    private static void UpdateReddit(Podcast podcast, string subreddit, string username, string password)
     {
       Console.WriteLine("Updating Reddit wiki");
 
@@ -162,6 +163,10 @@ namespace podcloud
       Console.WriteLine("New wiki line: " + newEpisodeLine);
 
       sub.Wiki.EditPage("index", String.Join(Environment.NewLine, contentLines), reason: podcast.Title.Left(256));
+
+      var post = sub.SubmitPost(podcast.Title, podcast.EpisodeUrl);
+      var comment = post.Comment($"Official description:\r\n>{podcast.Description}");
+      comment.Distinguish(VotableThing.DistinguishType.Special);
     }
 
     private static StringContent GetStringContent(string content)

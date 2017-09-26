@@ -8,7 +8,7 @@ namespace podcloud
         public string SoundCloudPassword { get; set; }
         public int?   EpisodeSkipCount   { get; set; }
         public bool   UploadLatest       { get; set; }
-        public bool   UpdateRedditWiki   { get; set; }
+        public bool   UpdateReddit   { get; set; }
         public string SubRedditName      { get; set; }
         public string RedditUsername     { get; set; }
         public string RedditPassword     { get; set; }
