@@ -79,7 +79,7 @@ namespace podcloud
 
         Console.WriteLine($"Item title {podcast.Title}, link {podcast.EpisodeUrl}, released {podcast.ReleaseDate}, enclosure {podcast.Mp3Url}, art {podcast.ArtUrl}, description {podcast.Description.Left(20)}... ");
 
-        if (options.PostToSoundCloud)
+        if (options.UploadToSoundCloud)
         {
           podcast.DownloadFiles();
           PostToSoundCloud(podcast, options.SoundCloudUsername, options.SoundCloudPassword);
@@ -157,16 +157,23 @@ namespace podcloud
 
       var contentLines = wikiPageContent.Split(Environment.NewLine).ToList();
       var tableSeparatorIndex = contentLines.IndexOf(":--|:-:|:--|:--");
-      var newEpisodeLine = $"[{podcast.Title}]({podcast.EpisodeUrl})|{podcast.ReleaseDate:d}|{podcast.Description.Replace("\r", null).Replace("\n", null)}|[Mp3]({podcast.Mp3Url})";
+      var newEpisodeLine = $"[{podcast.Title.Replace("’", "'")}]({podcast.EpisodeUrl})|{podcast.ReleaseDate:d}|{podcast.Description.Replace("\r", null).Replace("\n", null)}|[Mp3]({podcast.Mp3Url})";
       contentLines.Insert(tableSeparatorIndex + 1, newEpisodeLine);
 
       Console.WriteLine("New wiki line: " + newEpisodeLine);
 
-      sub.Wiki.EditPage("index", String.Join(Environment.NewLine, contentLines), reason: podcast.Title.Left(256));
+      try
+      {
+        sub.Wiki.EditPage("index", String.Join(Environment.NewLine, contentLines), reason: podcast.Title.Left(256));
+      }
+      catch (Exception exception)
+      {
+        Console.WriteLine("Wiki edit failed: " + exception);
+      }
 
       var post = sub.SubmitPost(podcast.Title, podcast.EpisodeUrl);
       var comment = post.Comment($"Official description:\r\n>{podcast.Description}");
-      comment.Distinguish(VotableThing.DistinguishType.Special);
+      comment.Distinguish(VotableThing.DistinguishType.Moderator);
     }
 
     private static StringContent GetStringContent(string content)
