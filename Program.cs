@@ -151,9 +151,12 @@ namespace podcloud
     {
       Console.WriteLine("Updating Reddit wiki");
 
-      var reddit = new Reddit(username, password);
-      var sub = reddit.GetSubreddit(subreddit);
-      var wikiPageContent = sub.Wiki.GetPage("index").MarkdownContent;
+      var botAgent = new BotWebAgent(
+        username, password, "Y4oVLWwzPuymNQ", "_I9Y3z_wIoLWSYT9Y0piHA2-hKI", "https://github.com/ajryan/podcloud");
+
+      var reddit = new Reddit(botAgent, false);
+      var sub = reddit.GetSubredditAsync(subreddit).Result;
+      var wikiPageContent = sub.GetWiki.GetPageAsync("index").Result.MarkdownContent;
 
       var contentLines = wikiPageContent.Split(Environment.NewLine).ToList();
       var tableSeparatorIndex = contentLines.IndexOf(":--|:-:|:--|:--");
@@ -164,16 +167,16 @@ namespace podcloud
 
       try
       {
-        sub.Wiki.EditPage("index", String.Join(Environment.NewLine, contentLines), reason: podcast.Title.Left(256));
+        sub.GetWiki.EditPageAsync("index", String.Join(Environment.NewLine, contentLines), reason: podcast.Title.Left(256)).Wait();
       }
       catch (Exception exception)
       {
         Console.WriteLine("Wiki edit failed: " + exception);
       }
 
-      var post = sub.SubmitPost(podcast.Title, podcast.EpisodeUrl);
-      var comment = post.Comment($"Official description:\r\n>{podcast.Description}");
-      comment.Distinguish(VotableThing.DistinguishType.Moderator);
+      var post = sub.SubmitPostAsync(podcast.Title, podcast.EpisodeUrl).Result;
+      var comment = post.CommentAsync($"Official description:\r\n>{podcast.Description}").Result;
+      comment.DistinguishAsync(VotableThing.DistinguishType.Moderator).Wait();
     }
 
     private static StringContent GetStringContent(string content)
