@@ -17,15 +17,17 @@ namespace podcloud
   {
     static void Main(string[] args)
     {
-      if (!File.Exists("podcloud.json"))
+      var configPath = args.Length > 0 ? args[0] : "podcloud.json";
+
+      if (!File.Exists(configPath))
       {
-        Console.WriteLine("Please provide config file podcloud.json. See sampleconfig.json.");
+        Console.WriteLine($"{configPath} does not exist. See sampleconfig.json.");
         Environment.Exit(1);
       }
 
       var builder = new ConfigurationBuilder()
         .SetBasePath(Directory.GetCurrentDirectory())
-        .AddJsonFile("podcloud.json");
+        .AddJsonFile(configPath);
 
       var options = new Options();
 
@@ -79,11 +81,11 @@ namespace podcloud
 
         Console.WriteLine($"Item title {podcast.Title}, link {podcast.EpisodeUrl}, released {podcast.ReleaseDate}, enclosure {podcast.Mp3Url}, art {podcast.ArtUrl}, description {podcast.Description.Left(20)}... ");
 
-        if (options.UploadToSoundCloud)
-        {
-          podcast.DownloadFiles();
-          PostToSoundCloud(podcast, options.SoundCloudUsername, options.SoundCloudPassword);
-        }
+        //if (options.UploadToSoundCloud)
+        //{
+        //  podcast.DownloadFiles();
+        //  PostToSoundCloud(podcast, options.SoundCloudUsername, options.SoundCloudPassword);
+        //}
 
         if (options.UpdateReddit)
           UpdateReddit(podcast, options.SubRedditName, options.RedditUsername, options.RedditPassword);
@@ -103,15 +105,16 @@ namespace podcloud
       const string CLIENT_SECRET = "b299b6681e00dfd9f5015639c7f5fe29";
 
       var httpClient = new HttpClient { Timeout = TimeSpan.FromHours(2d) };
-      var requestUrl = $"https://api.soundcloud.com/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=password&username={userName}&password={password}";
+      var requestUrl = $"https://soundcloud.com/connect?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&redirect_uri=https://tryptopain.com&reponse_type=code_and_token&scope=*";
 
       var tokenRequest = new HttpRequestMessage(
         HttpMethod.Post,
         requestUrl);
 
-      string accessToken = httpClient.SendAsync(tokenRequest).ContinueWith(responseTask =>
+      string accessToken = httpClient.GetAsync(new Uri(requestUrl)).ContinueWith(responseTask =>
       {
-        var tokenObject = JObject.Parse(responseTask.Result.Content.ReadAsStringAsync().Result);
+        var json = responseTask.Result.Content.ReadAsStringAsync().Result;
+        var tokenObject = JObject.Parse(json);
         return (string)((JValue)tokenObject["access_token"]).Value;
       }).Result;
 
