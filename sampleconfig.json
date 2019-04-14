@@ -1,12 +1,11 @@
 {
-    "FeedUrl" :            "http://test.com",
-    "UploadToSoundCloud":  true,
-    "SoundCloudUsername" : "username",
-    "SoundCloudPassword" : "password",
-    "EpisodeSkipCount" :   null,
-    "UploadLatest" :       true,
-    "UpdateReddit":        true,
-    "SubRedditName" :      "dopeypodcast",
-    "RedditUsername" :     "username",
-    "RedditPassword" :     "password"
+  "FeedUrl": "http://test.com",
+  "UploadToSoundCloud": true,
+  "SoundCloudAccessToken": "soundcloud_access_token",
+  "EpisodeSkipCount": null,
+  "UploadLatest": true,
+  "UpdateReddit": true,
+  "SubRedditName": "dopeypodcast",
+  "RedditUsername": "username",
+  "RedditPassword": "password"
 }

@@ -4,8 +4,7 @@ namespace podcloud
     {
         public string FeedUrl            { get; set; }
         public bool   UploadToSoundCloud { get; set; }
-        public string SoundCloudUsername { get; set; }
-        public string SoundCloudPassword { get; set; }
+        public string SoundCloudAccessToken { get; set; }
         public int?   EpisodeSkipCount   { get; set; }
         public bool   UploadLatest       { get; set; }
         public bool   UpdateReddit       { get; set; }

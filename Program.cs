@@ -7,7 +7,6 @@ using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json.Linq;
 using RedditSharp;
 using RedditSharp.Things;
 
@@ -15,7 +14,7 @@ namespace podcloud
 {
   internal class Program
   {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
       var configPath = args.Length > 0 ? args[0] : "podcloud.json";
 
@@ -33,7 +32,8 @@ namespace podcloud
 
       builder.Build().Bind(options);
 
-      IEnumerable<XElement> allItems = XDocument.Parse(GetFeed(options.FeedUrl).Result).Descendants("item");
+      string feed = await GetFeed(options.FeedUrl);
+      IEnumerable<XElement> allItems = XDocument.Parse(feed).Descendants("item");
       IEnumerable<XElement> itemsToProcess;
 
       if (options.UploadLatest)
@@ -56,7 +56,7 @@ namespace podcloud
 
         string title = item.Element("title")?.Value;
         string link = item.Element("link")?.Value;
-        DateTime.TryParse(item.Element("pubDate").Value, out var pubDate);
+        DateTime.TryParse(item.Element("pubDate")?.Value, out var pubDate);
         string mp3Url = item.Element("enclosure")?.Attribute("url")?.Value;
 
         if (String.IsNullOrEmpty(title) || String.IsNullOrEmpty(mp3Url))
@@ -75,20 +75,20 @@ namespace podcloud
                         ReleaseDate = pubDate,
                         Mp3Url      = mp3Url,
                         ArtUrl      = item.Descendants(itunes + "image").FirstOrDefault()?.FirstAttribute?.Value,
-                        Description = item.Element("description")?.Value?.Replace("<p>", "")?.Replace("</p>", ""),
+                        Description = item.Element("description")?.Value.Replace("<p>", "")?.Replace("</p>", ""),
                         Tags        = item.Elements("category").Select(e => e.Value).ToArray()
                       };
 
         Console.WriteLine($"Item title {podcast.Title}, link {podcast.EpisodeUrl}, released {podcast.ReleaseDate}, enclosure {podcast.Mp3Url}, art {podcast.ArtUrl}, description {podcast.Description.Left(20)}... ");
 
-        //if (options.UploadToSoundCloud)
-        //{
-        //  podcast.DownloadFiles();
-        //  PostToSoundCloud(podcast, options.SoundCloudUsername, options.SoundCloudPassword);
-        //}
+        if (options.UploadToSoundCloud)
+        {
+          podcast.DownloadFiles();
+          await PostToSoundCloud(podcast, options.SoundCloudAccessToken);
+        }
 
         if (options.UpdateReddit)
-          UpdateReddit(podcast, options.SubRedditName, options.RedditUsername, options.RedditPassword);
+          await UpdateReddit(podcast, options.SubRedditName, options.RedditUsername, options.RedditPassword);
       }
 
       Console.WriteLine("done");
@@ -99,25 +99,8 @@ namespace podcloud
       return new HttpClient().GetStringAsync(feedUrl);
     }
 
-    private static void PostToSoundCloud(Podcast podcast, string userName, string password)
+    private static async Task PostToSoundCloud(Podcast podcast, string accessToken)
     {
-      const string CLIENT_ID = "ffc80dc8b5bd435a15f9808724f73c40";
-      const string CLIENT_SECRET = "b299b6681e00dfd9f5015639c7f5fe29";
-
-      var httpClient = new HttpClient { Timeout = TimeSpan.FromHours(2d) };
-      var requestUrl = $"https://soundcloud.com/connect?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&redirect_uri=https://tryptopain.com&reponse_type=code_and_token&scope=*";
-
-      var tokenRequest = new HttpRequestMessage(
-        HttpMethod.Post,
-        requestUrl);
-
-      string accessToken = httpClient.GetAsync(new Uri(requestUrl)).ContinueWith(responseTask =>
-      {
-        var json = responseTask.Result.Content.ReadAsStringAsync().Result;
-        var tokenObject = JObject.Parse(json);
-        return (string)((JValue)tokenObject["access_token"]).Value;
-      }).Result;
-
       var mp3Content = new ByteArrayContent(File.ReadAllBytes(podcast.Mp3Path));
       mp3Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
@@ -147,10 +130,12 @@ namespace podcloud
       };
 
       Console.WriteLine("Uploading...");
-      httpClient.SendAsync(uploadRequest).ContinueWith(responseTask => Console.WriteLine("Response " + responseTask.Result.ToString())).Wait();
+      var httpClient = new HttpClient { Timeout = TimeSpan.FromHours(2d) };
+      var response = await httpClient.SendAsync(uploadRequest);
+      Console.WriteLine("Response " + response);
     }
 
-    private static void UpdateReddit(Podcast podcast, string subreddit, string username, string password)
+    private static async Task UpdateReddit(Podcast podcast, string subreddit, string username, string password)
     {
       Console.WriteLine("Updating Reddit wiki");
 
@@ -158,8 +143,8 @@ namespace podcloud
         username, password, "Y4oVLWwzPuymNQ", "_I9Y3z_wIoLWSYT9Y0piHA2-hKI", "https://github.com/ajryan/podcloud");
 
       var reddit = new Reddit(botAgent, false);
-      var sub = reddit.GetSubredditAsync(subreddit).Result;
-      var wikiPageContent = sub.GetWiki.GetPageAsync("index").Result.MarkdownContent;
+      var sub = await reddit.GetSubredditAsync(subreddit);
+      var wikiPageContent = (await sub.GetWiki.GetPageAsync("index")).MarkdownContent;
 
       var contentLines = wikiPageContent.Split(Environment.NewLine).ToList();
       var tableSeparatorIndex = contentLines.IndexOf(":--|:-:|:--|:--");
@@ -179,7 +164,7 @@ namespace podcloud
 
       var post = sub.SubmitPostAsync(podcast.Title, podcast.EpisodeUrl).Result;
       var comment = post.CommentAsync($"Official description:\r\n>{podcast.Description}").Result;
-      comment.DistinguishAsync(VotableThing.DistinguishType.Moderator).Wait();
+      comment.DistinguishAsync(ModeratableThing.DistinguishType.Moderator).Wait();
     }
 
     private static StringContent GetStringContent(string content)
